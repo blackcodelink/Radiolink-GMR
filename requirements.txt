@@ -1,0 +1,4 @@
+flet==0.24.1
+pydicom==2.4.4
+pynetdicom==2.1.1
+requests==2.32.3

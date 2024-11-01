@@ -1,0 +1,8 @@
+Radiolink Proprietary License
+Copyright © 2024 blackcodelink and GMR Network.
+
+All rights reserved.
+
+Permission is granted to blackcodelink and GMR Network to use, modify, and distribute this software (“Radiolink”) for internal business purposes. Except as expressly permitted by blackcodelink and GMR Network, no person or entity is authorized to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of this software or any associated documentation.
+
+Any unauthorized use of this software is strictly prohibited. The copyright notice and this license shall be included in all copies or substantial portions of the Software for reference.
