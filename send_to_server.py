@@ -4,6 +4,7 @@
 import requests
 import logging
 from typing import Dict, Any
+import os
 
 def send_to_server(data: Dict[str, Any], dicom_file_path: str) -> bool:
     """
@@ -39,6 +40,7 @@ def send_to_server(data: Dict[str, Any], dicom_file_path: str) -> bool:
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to upload {dicom_file_path}: {str(e)}")
         return False
+
 
 
 # send_to_server(

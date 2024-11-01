@@ -27,6 +27,7 @@ import concurrent.futures
 from db import get_procs
 import time
 import requests
+from app_update import check_for_update, download_update, install_update
 
 
 # Global state management
@@ -352,6 +353,33 @@ def open_login_window(e, page):
     page.update()
 
 
+def on_update_check_complete(url, new_version, page, loader):
+    """
+    Callback after checking for an update. Starts download if an update is available.
+    
+    Args:
+        url (str): Download URL for the new version.
+        new_version (str): The latest version.
+        page (ft.Page): The current page instance for GUI updates.
+        loader (ft.ProgressRing): Loader instance to show/hide loading state.
+    """
+    loader.visible = False
+    page.update()
+
+    if url:
+        page.snack_bar = ft.SnackBar(content=ft.Text("New update available!"))
+        page.snack_bar.open = True
+        page.update()
+        
+        def on_download_complete():
+            install_update(new_version)
+        
+        download_update(url, on_download_complete)
+    else:
+        page.snack_bar = ft.SnackBar(content=ft.Text("No new updates available."))
+        page.snack_bar.open = True
+        page.update()
+
 def main(page: ft.Page):
     """
     Main application entry point. Sets up the UI layout and navigation.
@@ -526,5 +554,17 @@ def main(page: ft.Page):
             expand=True,
         )
     )
+
+    loader = ft.ProgressRing(visible=False)
+
+    # def check_updates(e):
+    #     loader.visible = True
+    #     page.update()
+    #     threading.Thread(
+    #         target=lambda: on_update_check_complete(*check_for_update(), page, loader)
+    #     ).start()
+    
+    # update_button = ft.ElevatedButton("Check for Updates", on_click=check_updates)
+    # page.add(ft.Row([update_button, loader]))
 
 ft.app(target=main)
