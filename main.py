@@ -1,3 +1,24 @@
+"""
+Radiolink - DICOM Server Management Interface
+Copyright (c) 2024 BlackCodeLink. All rights reserved.
+
+This module implements the graphical user interface for managing the Radiolink DICOM server.
+It provides functionality for server control, configuration management, and process monitoring.
+
+Key features:
+- Server start/stop/restart capabilities 
+- Configuration management for AE Title, Port, and Technician settings
+- Real-time process monitoring with auto-refresh
+- Secure authentication for technician access
+- Clean and intuitive navigation interface
+
+Dependencies:
+- flet: For building the GUI
+- requests: For authentication API calls
+- threading: For background tasks
+- concurrent.futures: For server management
+"""
+
 import flet as ft
 from db import get_config, update_config
 from dicom_server import dicom_server
@@ -7,15 +28,18 @@ from db import get_procs
 import time
 import requests
 
-# Global variables
-dicom_server_future = None
-task_lock = threading.Lock()
-update_thread = None
-config = {}
+
+# Global state management
+dicom_server_future = None  # Tracks the running server instance
+task_lock = threading.Lock()  # Lock for thread-safe server operations
+update_thread = None  # Background thread for auto-updating process list
+config = {}  # Current server configuration
+
 
 def start_dicom_server():
     """
     Starts the DICOM server in a background thread using ThreadPoolExecutor.
+    Uses task_lock to ensure thread-safe server management.
     """
     global dicom_server_future
 
@@ -28,9 +52,13 @@ def start_dicom_server():
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         dicom_server_future = executor.submit(dicom_server)
 
+
 def restart_dicom_server(page):
     """
     Restarts the DICOM server with current configuration.
+    
+    Args:
+        page: The current Flet page instance for UI updates
     """
     print("Restarting DICOM server...")
     start_dicom_server()
@@ -46,12 +74,19 @@ def restart_dicom_server(page):
 # Initialize global config
 config = get_config()
 
-print("Config in main: ", config)
 
 # Start initial DICOM server with current config values
 start_dicom_server()
 
+
 def save_settings(e, page):
+    """
+    Validates and saves server configuration settings.
+    
+    Args:
+        e: Event object
+        page: Current Flet page instance
+    """
     settings_column = page.controls[0].controls[2].controls[0]
     ae_title = settings_column.controls[1].value
     port = int(settings_column.controls[2].value)  # Convert port to integer
@@ -100,7 +135,15 @@ def save_settings(e, page):
     page.clean()
     main(page)
 
+
 def update_data_table(data_table, page):
+    """
+    Updates the process monitoring data table with fresh data.
+    
+    Args:
+        data_table: The DataTable widget to update
+        page: Current Flet page instance
+    """
     data_table.rows = [
         ft.DataRow(
             cells=[
@@ -108,12 +151,22 @@ def update_data_table(data_table, page):
                 ft.DataCell(ft.Text(str(proc[1]))),
                 ft.DataCell(ft.Text(str(proc[2]))),
                 ft.DataCell(ft.Text(str(proc[3]))),
+                ft.DataCell(ft.Text(str(proc[4]))),  # Status
+                ft.DataCell(ft.Text(f"{proc[5]}%")),  # Upload percentage
             ],
         ) for proc in get_procs()
     ]
     page.update()
 
+
 def start_auto_update(data_table, page):
+    """
+    Starts a background thread for automatic data table updates.
+    
+    Args:
+        data_table: The DataTable widget to auto-update
+        page: Current Flet page instance
+    """
     global update_thread
     def update_loop():
         while True:
@@ -123,9 +176,22 @@ def start_auto_update(data_table, page):
     update_thread = threading.Thread(target=update_loop, daemon=True)
     update_thread.start()
 
+
 def login(email, password, page):
+    """
+    Authenticates technician credentials against the remote API.
+    
+    Args:
+        email: Technician email
+        password: Technician password
+        page: Current Flet page instance
+        
+    Returns:
+        bool: True if login successful, False if invalid credentials, None if network error
+    """
     try:
-        response = requests.post(f"https://admin.gmrnetwork.in/api/v1/users/login/", json={"email": email, "password": password})
+        response = requests.post(f"https://admin.gmrnetwork.in/api/v1/users/login/", 
+                               json={"email": email, "password": password})
         status = response.status_code
         if status == 200:
             # Update global config and restart server with new email
@@ -140,11 +206,26 @@ def login(email, password, page):
         print(f"Error logging in: {e}")
         return None
 
+
 def handle_close(e, page):
+    """Closes the login dialog."""
     page.dialog.open = False
     page.update()
 
+
 def handle_login(e, page, email_field, password_field, login_button, progress_ring, cancel_button):
+    """
+    Handles the login button click event.
+    
+    Args:
+        e: Event object
+        page: Current Flet page instance
+        email_field: Email input field
+        password_field: Password input field
+        login_button: Login button widget
+        progress_ring: Loading indicator widget
+        cancel_button: Cancel button widget
+    """
     email = email_field.value
     password = password_field.value
     
@@ -192,7 +273,15 @@ def handle_login(e, page, email_field, password_field, login_button, progress_ri
         page.snack_bar.open = True
         page.update()
 
+
 def open_login_window(e, page):
+    """
+    Opens the login dialog window.
+    
+    Args:
+        e: Event object
+        page: Current Flet page instance
+    """
     email_field = ft.TextField(label="Email", width=350)
     password_field = ft.TextField(label="Password", password=True, width=350)
     
@@ -264,14 +353,18 @@ def open_login_window(e, page):
 
 
 def main(page: ft.Page):
-
+    """
+    Main application entry point. Sets up the UI layout and navigation.
+    
+    Args:
+        page: The root Flet page instance
+    """
     page.title = "Radiolink"
-
     page.window.width = 900
     page.window.height = 800
 
-
     def handle_navigation_change(e):
+        """Handles navigation rail selection changes."""
         content_column.controls.clear()
         selected_index = e.control.selected_index
         
@@ -282,6 +375,8 @@ def main(page: ft.Page):
                     ft.DataColumn(ft.Text("Patient ID")),
                     ft.DataColumn(ft.Text("Patient Name")),
                     ft.DataColumn(ft.Text("Images")),
+                    ft.DataColumn(ft.Text("Status")),
+                    ft.DataColumn(ft.Text("Upload %")),
                 ],
                 rows=[
                     ft.DataRow(
@@ -290,6 +385,8 @@ def main(page: ft.Page):
                             ft.DataCell(ft.Text(str(proc[1]))),
                             ft.DataCell(ft.Text(str(proc[2]))),
                             ft.DataCell(ft.Text(str(proc[3]))),
+                            ft.DataCell(ft.Text(str(proc[4]))),  # Status
+                            ft.DataCell(ft.Text(f"{proc[5]}%")),  # Upload percentage
                         ],
                     ) for proc in get_procs()
                 ],
@@ -297,28 +394,12 @@ def main(page: ft.Page):
                 heading_row_color=ft.colors.BLUE_50,
             )
             
-            refresh_button = ft.ElevatedButton(
-                text="Refresh",
-                style=ft.ButtonStyle(
-                    color=ft.colors.WHITE,
-                    bgcolor=ft.colors.BLUE_500,
-                ),
-                on_click=lambda _: update_data_table(data_table, page)
-            )
-            
-            auto_update_button = ft.ElevatedButton(
-                text="Auto Update",
-                style=ft.ButtonStyle(
-                    color=ft.colors.WHITE,
-                    bgcolor=ft.colors.GREEN_500,
-                ),
-                on_click=lambda _: start_auto_update(data_table, page)
-            )
+            # Start auto-update immediately
+            start_auto_update(data_table, page)
             
             content_column.controls.append(
                 ft.Column([
                     ft.Text("Processes View", size=20, weight=ft.FontWeight.BOLD),
-                    ft.Row([refresh_button, auto_update_button]),
                     data_table
                 ])
             )
@@ -407,6 +488,8 @@ def main(page: ft.Page):
                         ft.DataColumn(ft.Text("Patient ID")),
                         ft.DataColumn(ft.Text("Patient Name")),
                         ft.DataColumn(ft.Text("Images")),
+                        ft.DataColumn(ft.Text("Status")),
+                        ft.DataColumn(ft.Text("Upload %")),
                     ],
                     rows=[
                         ft.DataRow(
@@ -415,6 +498,8 @@ def main(page: ft.Page):
                                 ft.DataCell(ft.Text(str(proc[1]))),
                                 ft.DataCell(ft.Text(str(proc[2]))),
                                 ft.DataCell(ft.Text(str(proc[3]))),
+                                ft.DataCell(ft.Text(str(proc[4]))),  # Status
+                                ft.DataCell(ft.Text(f"{proc[5]}%")),  # Upload percentage
                             ],
                         ) for proc in get_procs()
                     ],
@@ -427,6 +512,10 @@ def main(page: ft.Page):
         expand=True,
     )
 
+    # Start auto-update immediately when app launches
+    data_table = content_column.controls[0].controls[1]
+    start_auto_update(data_table, page)
+
     page.add(
         ft.Row(
             [
@@ -437,7 +526,5 @@ def main(page: ft.Page):
             expand=True,
         )
     )
-
-
 
 ft.app(target=main)
